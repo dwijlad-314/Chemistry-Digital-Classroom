@@ -1,7 +1,9 @@
 import * as THREE from "three";
-import { Canvas } from "@react-three/fiber";
+import { Canvas, useFrame } from "@react-three/fiber";
 import { OrbitControls, Html, Text } from "@react-three/drei";
 import "./VirtualLab.css";
+import { useState } from "react";
+import { useRef } from "react";
 
 
 function Label({ children, position }) {
@@ -219,7 +221,7 @@ function ConicalFlask({ position }) {
         position={[0, 0.24, 0]}
         rotation={[Math.PI / 2, 0, 0]}
       >
-      <torusGeometry args={[0.065, 0.004, 12, 64]} />
+      <torusGeometry args={[0.065, 0.006, 16, 64]} />
       <meshPhysicalMaterial
         color="#dce9e5"
         transparent
@@ -238,9 +240,37 @@ function ConicalFlask({ position }) {
 
 
 function Burette() {
+  const [isOpen, setIsOpen] = useState(false);
+
+  const liquidRef = useRef();
+  const meniscusRef = useRef();
+  const liquidLevelRef = useRef(0.87);
+
+  useFrame((_, delta) => {
+    if (isOpen && liquidLevelRef.current > 0) {
+      liquidLevelRef.current = Math.max(
+        0,
+        liquidLevelRef.current - delta * 0.04
+      );
+
+      const height = liquidLevelRef.current;
+      const bottom = 1.35;
+
+      if (liquidRef.current) {
+        liquidRef.current.scale.y = height / 0.87;
+        liquidRef.current.position.y = bottom + height / 2;
+      }
+
+      if (meniscusRef.current) {
+        meniscusRef.current.position.y = bottom + height;
+        meniscusRef.current.visible = height > 0.005;
+      }
+    }
+  });
+
   return (
     <group position={[-1.25, 0, 0]}>
-      <mesh position={[0, 1.15, 0]}>
+      <mesh ref={liquidRef} position={[0, 1.15, 0]}>
         <boxGeometry args={[0.06, 2.15, 0.06]} />
         <meshStandardMaterial color="#64756b" metalness={0.5} />
       </mesh>
@@ -267,33 +297,71 @@ function Burette() {
           depthWrite={false}
         />
       </mesh>
+
+      {/* Liquid column inside burette */}
+      <mesh position={[0.12, 1.53, 0]}>
+        <cylinderGeometry args={[0.020, 0.020, 1.38, 48]} />
+        <meshPhysicalMaterial
+          color="#65cfe0"
+          transparent
+          opacity={0.88}
+          roughness={0.16}
+          metalness={0}
+          transmission={0.03}
+          thickness={0.12}
+          depthWrite={false}
+        />
+      </mesh>
+
+      {/* Curved liquid meniscus */}
+      <mesh
+        ref={meniscusRef}
+        position={[0.12, 2.22, 0]}
+        scale={[1, 0.25, 1]}
+      >
+      <sphereGeometry
+        args={[0.020, 32, 16, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2]}
+      />
+      <meshPhysicalMaterial
+        color="#8be2ed"
+        transparent
+        opacity={0.90}
+        roughness={0.14}
+        metalness={0}
+        transmission={0.02}
+        depthWrite={false}
+      />
+      </mesh>
+
+
       <mesh position={[0.12, 0.78, 0]}>
         <boxGeometry args={[0.25, 0.045, 0.07]} />
         <meshStandardMaterial color="#e5e8e3" />
       </mesh>
       
+      
       {/* Burette graduation markings */}
-      {Array.from({ length: 30 }, (_, i) => {
-        const isMajor = i % 3 === 0;
+      {Array.from({ length: 31 }, (_, i) => {
+      const isMajor = i % 3 === 0;
 
-        return (
-          <group key={i}>
-          <mesh
-            position={[
-            0.155 + (isMajor ? 0 : 0),
-            2.22 - i * 0.026,
+      return (
+        <group key={i}>
+        <mesh
+          position={[
+            0.155,
+            2.22 - i * 0.044,
             0.035
-        ]}
+          ]}
         >
         <boxGeometry
           args={[isMajor ? 0.065 : 0.035, 0.006, 0.003]}
         />
         <meshBasicMaterial color="#24332f" />
-        </mesh>
+      </mesh>
 
       {isMajor && (
         <Text
-          position={[0.205, 2.22 - i * 0.026, 0.038]}
+          position={[0.205, 2.22 - i * 0.044, 0.038]}
           fontSize={0.035}
           color="#24332f"
           anchorX="left"
@@ -301,11 +369,10 @@ function Burette() {
         >
           {i}
         </Text>
-        )}
+      )}
     </group>
   );
 })}
-
 
       
       {/* Stopcock body - rounded glass valve */}
@@ -347,7 +414,8 @@ function Burette() {
       {/* Stopcock handle - short horizontal lever */}
       <group
         position={[0.12, 0.58, 0]}
-        rotation={[0, 0, -0.12]}
+        rotation={[0, 0, isOpen ? -0.85 : -0.12]}
+        onClick={() => setIsOpen(!isOpen)}
       >
         <mesh position={[0.075, 0, 0]}>
           <boxGeometry args={[0.15, 0.018, 0.025]} />
