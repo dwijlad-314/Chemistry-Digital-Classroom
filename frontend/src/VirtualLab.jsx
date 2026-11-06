@@ -244,7 +244,7 @@ function Burette() {
 
   const liquidRef = useRef();
   const meniscusRef = useRef();
-  const liquidLevelRef = useRef(0.87);
+  const liquidLevelRef = useRef(1.38);
 
   useFrame((_, delta) => {
     if (isOpen && liquidLevelRef.current > 0) {
@@ -254,10 +254,10 @@ function Burette() {
       );
 
       const height = liquidLevelRef.current;
-      const bottom = 1.35;
+      const bottom = 0.84;
 
       if (liquidRef.current) {
-        liquidRef.current.scale.y = height / 0.87;
+        liquidRef.current.scale.y = height / 1.38;
         liquidRef.current.position.y = bottom + height / 2;
       }
 
@@ -265,14 +265,21 @@ function Burette() {
         meniscusRef.current.position.y = bottom + height;
         meniscusRef.current.visible = height > 0.005;
       }
+      }
     }
-  });
+  );
 
   return (
     <group position={[-1.25, 0, 0]}>
-      <mesh ref={liquidRef} position={[0, 1.15, 0]}>
-        <boxGeometry args={[0.06, 2.15, 0.06]} />
-        <meshStandardMaterial color="#64756b" metalness={0.5} />
+    
+      {/* Cylindrical stainless-steel support rod */}
+      <mesh position={[0, 1.15, 0]}>
+        <cylinderGeometry args={[0.025, 0.025, 2.15, 32]} />
+        <meshStandardMaterial
+          color="#aeb8b8"
+          metalness={0.75}
+          roughness={0.28}
+        />
       </mesh>
       <mesh position={[0.12, 1.55, 0]}>
         <cylinderGeometry args={[0.055, 0.055, 1.45, 24]} />
@@ -299,7 +306,10 @@ function Burette() {
       </mesh>
 
       {/* Liquid column inside burette */}
-      <mesh position={[0.12, 1.53, 0]}>
+      <mesh
+        ref={liquidRef}
+        position={[0.12, 1.53, 0]}
+      >
         <cylinderGeometry args={[0.020, 0.020, 1.38, 48]} />
         <meshPhysicalMaterial
           color="#65cfe0"
@@ -613,7 +623,7 @@ function LabRoom() {
 
       {/* Apparatus */}
       <Burette />
-      <ConicalFlask position={[-0.85, 0.35, 0.25]} />
+      <ConicalFlask position={[-1.13, 0.35, 0]} />
       <Pipette position={[0.25, 0.58, 0.35]} />
       <ReagentBottle position={[1.15, 0.1, 0.35]} color="#e2c978" name="Acid" />
       <ReagentBottle position={[1.8, 0.1, 0.35]} color="#8bc8c1" name="Base" />
