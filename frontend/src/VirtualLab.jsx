@@ -169,8 +169,7 @@ function ReagentBottle({ position, color, name }) {
 
 
 
-
-function ConicalFlask({ position }) {
+function ConicalFlask({ position, liquidLevelRef }) {
   // One continuous profile: flat base -> sloping body -> smooth shoulder -> long neck.
   const outerProfile = [
     new THREE.Vector2(0.000, -0.333),
@@ -189,6 +188,8 @@ function ConicalFlask({ position }) {
     new THREE.Vector2(0.065, 0.240),
   ];
 
+  const flaskLiquidRef = useRef();
+
   const glassMaterial = {
     color: "#eaf8ff",
     transparent: true,
@@ -202,78 +203,184 @@ function ConicalFlask({ position }) {
     depthWrite: false,
   };
 
+  
+useFrame(() => {
+  if (!flaskLiquidRef.current || liquidLevelRef.current === undefined) {
+    return;
+  }
+
+  const level = THREE.MathUtils.clamp(
+    liquidLevelRef.current,
+    0,
+    0.9
+  );
+
+  if (level <= 0.0000000001) {
+    flaskLiquidRef.current.visible = false;
+    return;
+  }
+
+  const bottomY = -0.327;
+  const maxFillY = 0.035;
+  const visibleProgress = Math.pow(level / 0.9, 0.20);
+  const minVisibleHeight = 0.015;
+  const fillY =
+    bottomY +
+    minVisibleHeight +
+    visibleProgress * (maxFillY - bottomY - minVisibleHeight);
+
+  const liquidProfile = [
+    new THREE.Vector2(0, bottomY),
+    new THREE.Vector2(0.108, bottomY),
+  ];
+
+  for (let i = 1; i < outerProfile.length; i++) {
+    const point = outerProfile[i];
+
+    if (point.y > bottomY && point.y < fillY && point.x > 0.012) {
+      liquidProfile.push(
+        new THREE.Vector2(point.x - 0.012, point.y)
+      );
+    }
+  }
+
+  let topRadius = 0;
+
+  for (let i = 1; i < outerProfile.length; i++) {
+    const lower = outerProfile[i - 1];
+    const upper = outerProfile[i];
+
+    if (fillY >= lower.y && fillY <= upper.y) {
+      const span = upper.y - lower.y;
+
+      if (span > 0) {
+        const t = (fillY - lower.y) / span;
+        topRadius = THREE.MathUtils.lerp(
+          lower.x,
+          upper.x,
+          t
+        ) - 0.012;
+      }
+
+      break;
+    }
+  }
+
+  liquidProfile.push(
+    new THREE.Vector2(Math.max(topRadius, 0.001), fillY),
+    new THREE.Vector2(0, fillY)
+  );
+
+  const oldGeometry = flaskLiquidRef.current.geometry;
+
+  flaskLiquidRef.current.geometry = new THREE.LatheGeometry(
+    liquidProfile,
+    64
+  );
+
+  oldGeometry.dispose();
+
+  flaskLiquidRef.current.visible = true;
+});
+
+
   return (
     <group position={position}>
+      {/* Accumulating liquid inside conical flask */}
+      <mesh
+        ref={flaskLiquidRef}
+        position={[0, 0, 0]}
+        visible={false}
+      >
+        <cylinderGeometry args={[0.115, 0.115, 0.12, 64]} />
+        <meshPhysicalMaterial
+          color="#65cfe0"
+          transparent
+          opacity={1}
+          roughness={0.12}
+          metalness={0}
+          transmission={0.03}
+          thickness={0.12}
+          depthWrite={false}
+        />
+      </mesh>
+
       {/* Continuous glass body and neck */}
       <mesh>
         <latheGeometry args={[outerProfile, 96]} />
         <meshPhysicalMaterial {...glassMaterial} />
       </mesh>
 
-      {/* Small flat base, retained for a stable flask bottom */}
+      {/* Small flat base */}
       <mesh position={[0, -0.333, 0]}>
         <cylinderGeometry args={[0.12, 0.12, 0.012, 64]} />
         <meshPhysicalMaterial {...glassMaterial} />
       </mesh>
 
-      {/* Thickened glass rim around flask opening */}
+      {/* Thickened glass rim */}
       <mesh
         position={[0, 0.24, 0]}
         rotation={[Math.PI / 2, 0, 0]}
       >
-      <torusGeometry args={[0.065, 0.006, 16, 64]} />
-      <meshPhysicalMaterial
-        color="#dce9e5"
-        transparent
-        opacity={0.55}
-        roughness={0.12}
-        transmission={0.45}
-        thickness={0.15}
-        depthWrite={false}
-      />
+        <torusGeometry args={[0.065, 0.006, 16, 64]} />
+        <meshPhysicalMaterial
+          color="#dce9e5"
+          transparent
+          opacity={0.55}
+          roughness={0.12}
+          transmission={0.45}
+          thickness={0.15}
+          depthWrite={false}
+        />
       </mesh>
-    
     </group>
   );
 }
 
 
 
-function Burette() {
-  const [isOpen, setIsOpen] = useState(false);
+function Burette({ isOpen, setIsOpen, flaskLiquidLevel }) {
 
   const liquidRef = useRef();
   const meniscusRef = useRef();
   const liquidLevelRef = useRef(1.38);
 
-  useFrame((_, delta) => {
-    if (isOpen && liquidLevelRef.current > 0) {
-      liquidLevelRef.current = Math.max(
-        0,
-        liquidLevelRef.current - delta * 0.04
-      );
+  
+useFrame((_, delta) => {
 
-      const height = liquidLevelRef.current;
-      const bottom = 0.84;
+  if (isOpen && liquidLevelRef.current > 0) {
 
-      if (liquidRef.current) {
-        liquidRef.current.scale.y = height / 1.38;
-        liquidRef.current.position.y = bottom + height / 2;
-      }
+    liquidLevelRef.current = Math.max(
+      0,
+      liquidLevelRef.current - delta * 0.04
+    );
 
-      if (meniscusRef.current) {
-        meniscusRef.current.position.y = bottom + height;
-        meniscusRef.current.visible = height > 0.005;
-      }
-      }
+    flaskLiquidLevel.current = Math.min(
+      0.9,
+      flaskLiquidLevel.current + delta * 0.012
+    );
+
+    const height = liquidLevelRef.current;
+    const bottom = 0.89;
+
+    if (liquidRef.current) {
+      liquidRef.current.scale.y = height / 1.38;
+      liquidRef.current.position.y = bottom + height / 2;
     }
-  );
+
+    if (meniscusRef.current) {
+      meniscusRef.current.position.y = bottom + height;
+      meniscusRef.current.visible = height > 0.005;
+    }
+  }
+});
+
 
   return (
     <group position={[-1.25, 0, 0]}>
     
       {/* Cylindrical stainless-steel support rod */}
-      <mesh position={[0, 1.15, 0]}>
+      <mesh position={[0.43, 1.15, 0]}>
         <cylinderGeometry args={[0.025, 0.025, 2.15, 32]} />
         <meshStandardMaterial
           color="#aeb8b8"
@@ -281,7 +388,7 @@ function Burette() {
           roughness={0.28}
         />
       </mesh>
-      <mesh position={[0.12, 1.55, 0]}>
+      <mesh position={[0.12, 1.60, 0]}>
         <cylinderGeometry args={[0.055, 0.055, 1.45, 24]} />
         <meshStandardMaterial
           color="#b9e4e8"
@@ -289,7 +396,7 @@ function Burette() {
           opacity={0.5}
         />
       </mesh>
-      <mesh position={[0.12, 1.55, 0]}>
+      <mesh position={[0.12, 1.60, 0]}>
         <cylinderGeometry args={[0.027, 0.027, 1.45, 64]} />
         <meshPhysicalMaterial
           color="#eaf8ff"
@@ -308,7 +415,7 @@ function Burette() {
       {/* Liquid column inside burette */}
       <mesh
         ref={liquidRef}
-        position={[0.12, 1.53, 0]}
+        position={[0.12, 1.58, 0]}
       >
         <cylinderGeometry args={[0.020, 0.020, 1.38, 48]} />
         <meshPhysicalMaterial
@@ -326,7 +433,7 @@ function Burette() {
       {/* Curved liquid meniscus */}
       <mesh
         ref={meniscusRef}
-        position={[0.12, 2.22, 0]}
+        position={[0.12, 2.27, 0]}
         scale={[1, 0.25, 1]}
       >
       <sphereGeometry
@@ -344,8 +451,8 @@ function Burette() {
       </mesh>
 
 
-      <mesh position={[0.12, 0.78, 0]}>
-        <boxGeometry args={[0.25, 0.045, 0.07]} />
+      <mesh position={[0.275, 0.81, 0]}>
+        <boxGeometry args={[0.36, 0.045, 0.07]} />
         <meshStandardMaterial color="#e5e8e3" />
       </mesh>
       
@@ -359,7 +466,7 @@ function Burette() {
         <mesh
           position={[
             0.155,
-            2.22 - i * 0.044,
+            2.27 - i * 0.044,
             0.035
           ]}
         >
@@ -371,7 +478,7 @@ function Burette() {
 
       {isMajor && (
         <Text
-          position={[0.205, 2.22 - i * 0.044, 0.038]}
+          position={[0.205, 2.27 - i * 0.044, 0.038]}
           fontSize={0.035}
           color="#24332f"
           anchorX="left"
@@ -397,9 +504,9 @@ function Burette() {
         />
       </mesh>
 
-      {/* Valve connector - overlaps the burette tube slightly */}
-        <mesh position={[0.12, 0.675, 0]}>
-        <cylinderGeometry args={[0.027, 0.028, 0.12, 24]} />
+      {/* Extended upper glass valve connector */}
+      <mesh position={[0.12, 0.755, 0]}>
+        <cylinderGeometry args={[0.027, 0.028, 0.27, 24]} />
         <meshStandardMaterial
           color="#c4d9d8"
           transparent
@@ -410,7 +517,7 @@ function Burette() {
 
       {/* Horizontal stopcock spindle */}
       <mesh
-        position={[0.12, 0.58, 0]}
+        position={[0.12, 0.63, 0]}
         rotation={[Math.PI / 2, 0, 0]}
       >
         <cylinderGeometry args={[0.014, 0.014, 0.105, 24]} />
@@ -423,7 +530,7 @@ function Burette() {
 
       {/* Stopcock handle - short horizontal lever */}
       <group
-        position={[0.12, 0.58, 0]}
+        position={[0.12, 0.63, 0]}
         rotation={[0, 0, isOpen ? -0.85 : -0.12]}
         onClick={() => setIsOpen(!isOpen)}
       >
@@ -448,8 +555,8 @@ function Burette() {
       </group>
 
       {/* Lower glass outlet connector */}
-      <mesh position={[0.12, 0.505, 0]}>
-        <cylinderGeometry args={[0.022, 0.012, 0.065, 24]} />
+      <mesh position={[0.12, 0.545, 0]}>
+        <cylinderGeometry args={[0.022, 0.012, 0.105, 24]} />
         <meshStandardMaterial
           color="#c4d9d8"
           transparent
@@ -459,7 +566,7 @@ function Burette() {
       </mesh>
 
       {/* Narrow downward-facing glass nozzle */}
-      <mesh position={[0.12, 0.435, 0]}>
+      <mesh position={[0.12, 0.485, 0]}>
         <cylinderGeometry args={[0.012, 0.004, 0.09, 24]} />
         <meshStandardMaterial
           color="#c4d9d8"
@@ -470,13 +577,33 @@ function Burette() {
         />
       </mesh>
 
-      {/* Fine nozzle opening */}
-      <mesh position={[0.12, 0.388, 0]}>
-        <cylinderGeometry args={[0.0045, 0.0045, 0.003, 16]} />
-        <meshStandardMaterial
-          color="#91b8b5"
-          roughness={0.2}
+      {/* Fine nozzle opening - refined glass tip */}
+      <mesh position={[0.12, 0.438, 0]}>
+        <cylinderGeometry args={[0.0045, 0.0045, 0.006, 32]} />
+        <meshPhysicalMaterial
+          color="#c4d9d8"
+          transparent
+          opacity={0.8}
+          roughness={0.1}
+          metalness={0}
+          transmission={0.2}
+          thickness={0.015}
+          side={THREE.DoubleSide}
         />
+      </mesh>
+
+      {/* Animated liquid stream */}
+      <mesh
+        position={[0.12, 0.266, 0]}
+        visible={isOpen && liquidLevelRef.current > 0}
+      >
+      <cylinderGeometry args={[0.003, 0.004, 0.34, 24]} />
+      <meshBasicMaterial
+        color="#65cfe0"
+        transparent
+        opacity={0.9}
+        depthWrite={false}
+      />
       </mesh>
       <Label position={[0.05, 2.45, 0]}>Burette</Label>
     </group>
@@ -557,6 +684,9 @@ function Pipette({ position }) {
 
 
 function LabRoom() {
+  const [isOpen, setIsOpen] = useState(false);
+  const flaskLiquidLevel = useRef(0);
+
   return (
     <>
       {/* Laboratory background */}
@@ -622,8 +752,15 @@ function LabRoom() {
       </mesh>
 
       {/* Apparatus */}
-      <Burette />
-      <ConicalFlask position={[-1.13, 0.35, 0]} />
+      <Burette
+        isOpen={isOpen}
+        setIsOpen={setIsOpen}
+        flaskLiquidLevel={flaskLiquidLevel}
+      />
+      <ConicalFlask
+        position={[-1.13, 0.35, 0]}
+        liquidLevelRef={flaskLiquidLevel}
+      />
       <Pipette position={[0.25, 0.58, 0.35]} />
       <ReagentBottle position={[1.15, 0.1, 0.35]} color="#e2c978" name="Acid" />
       <ReagentBottle position={[1.8, 0.1, 0.35]} color="#8bc8c1" name="Base" />
@@ -654,7 +791,7 @@ export default function VirtualLab() {
           <OrbitControls
             makeDefault
             target={[0, 0.7, 0]}
-            minDistance={2.5}
+            minDistance={1.5}
             maxDistance={12}
             maxPolarAngle={Math.PI / 2.05}
           />
