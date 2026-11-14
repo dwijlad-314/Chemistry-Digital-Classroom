@@ -127,32 +127,43 @@ function ReagentBottle({ position, color, name }) {
       </mesh>
 
       
-      
-      
-      {/* Professional reagent bottle label */}
-      <mesh position={[0, 0.36, 0.181]}>
-        <boxGeometry args={[0.27, 0.18, 0.006]} />
+      {/* Curved professional reagent bottle label */}
+      <mesh position={[0, 0.36, 0]}>
+        <cylinderGeometry
+          args={[0.184, 0.184, 0.18, 64, 1, true, -0.78, 1.56]}
+        />
         <meshStandardMaterial
           color="#fffdf7"
           roughness={0.85}
+          side={THREE.DoubleSide}
         />
       </mesh>
 
-      {/* Single coloured identification strip */}
-      <mesh position={[0, 0.435, 0.185]}>
-        <boxGeometry args={[0.27, 0.025, 0.003]} />
-        <meshStandardMaterial color={color} />
+      {/* Curved coloured identification strip */}
+      <mesh position={[0, 0.435, 0]}>
+        <cylinderGeometry
+          args={[0.186, 0.186, 0.025, 64, 1, true, -0.78, 1.56]}
+        />
+        <meshStandardMaterial
+          color={color}
+          side={THREE.DoubleSide}
+        />
       </mesh>
 
-      {/* Single bottom border */}
-      <mesh position={[0, 0.282, 0.185]}>
-        <boxGeometry args={[0.23, 0.003, 0.003]} />
-        <meshStandardMaterial color="#aeb9b2" />
+      {/* Curved bottom border */}
+      <mesh position={[0, 0.282, 0]}>
+        <cylinderGeometry
+          args={[0.186, 0.186, 0.003, 64, 1, true, -0.78, 1.56]}
+        />
+        <meshStandardMaterial
+          color="#aeb9b2"
+          side={THREE.DoubleSide}
+        />
       </mesh>
 
-      {/* Single chemical name */}
+      {/* Centred chemical name */}
       <Text
-        position={[0, 0.355, 0.195]}
+        position={[0, 0.355, 0.191]}
         fontSize={0.05}
         color="#172c22"
         anchorX="center"
@@ -160,7 +171,7 @@ function ReagentBottle({ position, color, name }) {
         fontWeight="bold"
         textAlign="center"
       >
-      {name.toUpperCase()}
+        {name.toUpperCase()}
       </Text>
 
     </group>
@@ -222,7 +233,7 @@ useFrame(() => {
 
   const bottomY = -0.327;
   const maxFillY = 0.035;
-  const visibleProgress = Math.pow(level / 0.9, 0.20);
+  const visibleProgress = Math.pow(level / 0.9, 0.30);
   const minVisibleHeight = 0.015;
   const fillY =
     bottomY +
@@ -343,9 +354,9 @@ function Burette({ isOpen, setIsOpen, flaskLiquidLevel }) {
 
   const liquidRef = useRef();
   const meniscusRef = useRef();
+  const streamRef = useRef();
   const liquidLevelRef = useRef(1.38);
 
-  
 useFrame((_, delta) => {
 
   if (isOpen && liquidLevelRef.current > 0) {
@@ -373,8 +384,49 @@ useFrame((_, delta) => {
       meniscusRef.current.visible = height > 0.005;
     }
   }
-});
 
+  if (streamRef.current) {
+  const streamVisible =
+    isOpen && liquidLevelRef.current > 0;
+
+  streamRef.current.visible = streamVisible;
+
+  const flaskLevel = THREE.MathUtils.clamp(
+    flaskLiquidLevel.current,
+    0,
+    0.9
+  );
+
+  const bottomY = -0.327;
+  const maxFillY = 0.035;
+  const minVisibleHeight = 0.015;
+
+  const visibleProgress = Math.pow(
+    flaskLevel / 0.9,
+    0.30
+  );
+
+  const liquidSurfaceY =
+    0.35 +
+    bottomY +
+    minVisibleHeight +
+    visibleProgress * (
+      maxFillY - bottomY - minVisibleHeight
+    );
+
+  const nozzleTopY = 0.438;
+
+  const streamLength = Math.max(
+    0.005,
+    nozzleTopY - liquidSurfaceY
+  );
+
+  streamRef.current.scale.y = streamLength / 0.34;
+
+  streamRef.current.position.y =
+    nozzleTopY - streamLength / 2;
+  }
+});
 
   return (
     <group position={[-1.25, 0, 0]}>
@@ -594,8 +646,8 @@ useFrame((_, delta) => {
 
       {/* Animated liquid stream */}
       <mesh
+        ref={streamRef}
         position={[0.12, 0.266, 0]}
-        visible={isOpen && liquidLevelRef.current > 0}
       >
       <cylinderGeometry args={[0.003, 0.004, 0.34, 24]} />
       <meshBasicMaterial
@@ -615,7 +667,7 @@ function Pipette({ position }) {
   return (
     <group position={position} rotation={[0, 0, -0.35]}>
       {/* Upper narrow glass stem */}
-      <mesh position={[0, 0.27, 0]}>
+      <mesh position={[0, 0.185, 0]}>
         <cylinderGeometry args={[0.018, 0.022, 0.32, 32]} />
         <meshPhysicalMaterial
           color="#d8f0f2"
@@ -644,7 +696,7 @@ function Pipette({ position }) {
       </mesh>
 
       {/* Lower narrow stem */}
-      <mesh position={[0, -0.23, 0]}>
+      <mesh position={[0, -0.215, 0]}>
         <cylinderGeometry args={[0.022, 0.012, 0.30, 32]} />
         <meshPhysicalMaterial
           color="#d8f0f2"
@@ -761,7 +813,7 @@ function LabRoom() {
         position={[-1.13, 0.35, 0]}
         liquidLevelRef={flaskLiquidLevel}
       />
-      <Pipette position={[0.25, 0.58, 0.35]} />
+      <Pipette position={[0.25, 0.36, 0.35]} />
       <ReagentBottle position={[1.15, 0.1, 0.35]} color="#e2c978" name="Acid" />
       <ReagentBottle position={[1.8, 0.1, 0.35]} color="#8bc8c1" name="Base" />
 
